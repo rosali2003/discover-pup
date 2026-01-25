@@ -31,9 +31,15 @@ export type HomeStackParamList = {
   ParkDetail: { parkId: string; parkName: string };
 };
 
+export type MapStackParamList = {
+  MapView: undefined;
+  ParkDetail: { parkId: string; parkName: string };
+};
+
 const AuthStack = createStackNavigator<AuthStackParamList>();
 const MainTab = createBottomTabNavigator<MainTabParamList>();
 const HomeStack = createStackNavigator<HomeStackParamList>();
+const MapStack = createStackNavigator<MapStackParamList>();
 
 function AuthNavigator() {
   return (
@@ -62,6 +68,23 @@ function HomeNavigator() {
         options={({ route }) => ({ title: route.params.parkName })}
       />
     </HomeStack.Navigator>
+  );
+}
+
+function MapNavigator() {
+  return (
+    <MapStack.Navigator>
+      <MapStack.Screen
+        name="MapView"
+        component={MapScreen}
+        options={{ headerShown: false }}
+      />
+      <MapStack.Screen
+        name="ParkDetail"
+        component={ParkDetailScreen}
+        options={({ route }) => ({ title: route.params.parkName })}
+      />
+    </MapStack.Navigator>
   );
 }
 
@@ -103,11 +126,10 @@ function MainNavigator() {
       />
       <MainTab.Screen
         name="Map"
-        component={MapScreen}
+        component={MapNavigator}
         options={{
           tabBarLabel: 'Map',
-          headerShown: true,
-          title: 'Map',
+          headerShown: false,
         }}
       />
     </MainTab.Navigator>

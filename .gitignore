@@ -34,8 +34,25 @@ mobile/ios/Pods/
 mobile/ios/build/
 mobile/android/app/build/
 mobile/android/.gradle/
+mobile/android/gradle.properties
 mobile/.expo/
 mobile/.expo-shared/
+mobile/ios/Podfile
+mobile/.env
+
+
+# Android/IntelliJ
+#
+build/
+.idea
+.gradle
+local.properties
+*.iml
+*.hprof
+
+# Bundle artifacts
+*.jsbundle
+
 
 # Testing
 coverage/
@@ -48,3 +65,6 @@ coverage/
 *.pem
 *.key
 credentials.json
+
+
+

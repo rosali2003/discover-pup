@@ -2,6 +2,7 @@ import { Router } from "@oak";
 import type { RouterContext } from "@oak";
 import pool from "../db/connection.ts";
 import type { Park, ParkWithDogCount, DogWithOwner } from "../models/types.ts";
+import osmtogeojson from "osmtogeojson";
 
 const router = new Router();
 
@@ -50,7 +51,8 @@ router.get("/parks", async (ctx: RouterContext<string>) => {
     const result = await client.queryObject<ParkWithDogCount>(query, params);
 
     // Get total count
-    let countQuery = "SELECT COUNT(*) as total FROM parks WHERE is_active = true";
+    let countQuery =
+      "SELECT COUNT(*) as total FROM parks WHERE is_active = true";
     const countParams: any[] = [];
     if (city) {
       countQuery += " AND LOWER(city) = LOWER($1)";
@@ -97,9 +99,7 @@ router.get("/parks", async (ctx: RouterContext<string>) => {
 router.get("/parks/nearby", async (ctx: RouterContext<string>) => {
   const lat = parseFloat(ctx.request.url.searchParams.get("latitude") || "");
   const lng = parseFloat(ctx.request.url.searchParams.get("longitude") || "");
-  const radius = parseInt(
-    ctx.request.url.searchParams.get("radius") || "5000"
-  );
+  const radius = parseInt(ctx.request.url.searchParams.get("radius") || "5000");
 
   if (isNaN(lat) || isNaN(lng)) {
     ctx.response.status = 400;
@@ -229,6 +229,37 @@ router.get("/parks/:parkId", async (ctx: RouterContext<string>) => {
     };
   } finally {
     client.release();
+  }
+});
+
+router.get("/parks/retrieve-nyc-parks", async (ctx: RouterContext<string>) => {
+  const client = await pool.connect();
+
+  try {
+    const query = `...`; // above query
+    const url =
+      "https://overpass-api.de/api/interpreter?data=" +
+      encodeURIComponent(query);
+
+    const res = await fetch(url);
+    const osm = await res.json();
+
+    const geojson = osmtogeojson(osm);
+
+    // Filter to polygons only
+    const parkPolygons = geojson.features.filter(
+      (f: any) =>
+        f.geometry &&
+        (f.geometry.type === "Polygon" || f.geometry.type === "MultiPolygon")
+    );
+
+    ctx.response.status = 200;
+    ctx.response.body = {
+      success: true,
+      data: parkPolygons,
+    };
+  } catch (error) {
+    console.error("Map parks error:", error);
   }
 });
 
