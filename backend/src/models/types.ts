@@ -81,6 +81,8 @@ export interface Park {
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
+  osm_id?: number;
+  boundary?: string; // WKB hex from PostGIS, not used directly in app logic
 }
 
 export interface ParkHours {

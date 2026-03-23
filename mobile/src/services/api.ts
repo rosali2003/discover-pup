@@ -16,8 +16,10 @@ import type {
 
 // Configure this to point to your backend
 // For iOS Simulator, use your Mac's local IP address
+//'http://192.168.1.93:8000' for home
+// 'http://10.0.116.121:8000' for office
 const API_BASE_URL = __DEV__
-  ? 'http://192.168.1.93:8000'  // Development - use your Mac's IP
+  ? 'http://192.168.1.93:8000' // Development - use your Mac's IP
   : 'https://your-production-api.com'; // Production
 
 class ApiClient {

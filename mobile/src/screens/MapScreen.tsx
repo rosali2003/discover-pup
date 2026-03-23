@@ -13,7 +13,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { MapStackParamList } from '../navigation';
 import * as Location from 'expo-location';
 import Constants from 'expo-constants';
-import Mapbox, { Camera, LocationPuck, MapView, ShapeSource, SymbolLayer, CircleLayer } from '@rnmapbox/maps';
+import Mapbox, { Camera, LocationPuck, MapView, ShapeSource, SymbolLayer, CircleLayer, FillLayer, LineLayer } from '@rnmapbox/maps';
 import api from '../services/api';
 import type { ParkWithDogCount, ParkDetails, DogWithOwner } from '../types';
 
@@ -142,6 +142,24 @@ export default function MapScreen({ navigation }: Props) {
     }
   }
 
+  // Polygon boundaries for OSM parks
+  const parkPolygonsGeoJSON: GeoJSON.FeatureCollection = {
+    type: 'FeatureCollection',
+    features: parks
+      .filter((p) => p.boundary_geojson)
+      .map((p) => ({
+        type: 'Feature' as const,
+        id: p.id,
+        geometry: JSON.parse(p.boundary_geojson!) as GeoJSON.Geometry,
+        properties: {
+          id: p.id,
+          name: p.name,
+          dog_count: p.dog_count,
+          has_dogs: p.dog_count > 0,
+        },
+      })),
+  };
+
   // Convert parks to GeoJSON for Mapbox
   const parksGeoJSON: GeoJSON.FeatureCollection = {
     type: 'FeatureCollection',
@@ -187,6 +205,34 @@ export default function MapScreen({ navigation }: Props) {
         />
 
         <LocationPuck puckBearing="heading" puckBearingEnabled={true} />
+
+        {/* Park boundary polygons for OSM parks */}
+        <ShapeSource
+          id="parkPolygons"
+          shape={parkPolygonsGeoJSON}
+          onPress={(e: any) => {
+            const feature = e.features?.[0];
+            if (feature?.properties) {
+              const park = parks.find((p) => p.id === feature.properties?.id);
+              if (park) handleMarkerPress(park);
+            }
+          }}
+        >
+          <FillLayer
+            id="parkPolygonFill"
+            style={{
+              fillColor: ['case', ['get', 'has_dogs'], 'rgba(52, 199, 89, 0.15)', 'rgba(0, 122, 255, 0.1)'] as any,
+            }}
+          />
+          <LineLayer
+            id="parkPolygonOutline"
+            style={{
+              lineColor: ['case', ['get', 'has_dogs'], '#34C759', '#007AFF'] as any,
+              lineWidth: 2,
+              lineOpacity: 0.8,
+            }}
+          />
+        </ShapeSource>
 
         <ShapeSource
           id="parks"

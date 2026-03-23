@@ -2,7 +2,7 @@ import { Router } from "@oak";
 import type { RouterContext } from "@oak";
 import pool from "../db/connection.ts";
 import type { Park, ParkWithDogCount, DogWithOwner } from "../models/types.ts";
-import osmtogeojson from "osmtogeojson";
+import { syncNycDogParks } from "../services/osmSync.ts";
 
 const router = new Router();
 
@@ -22,7 +22,11 @@ router.get("/parks", async (ctx: RouterContext<string>) => {
     // Build query with optional city filter
     let query = `
       SELECT
-        p.*,
+        p.id, p.name, p.latitude, p.longitude, p.address, p.city, p.state,
+        p.zip_code, p.neighborhood, p.geofence_radius, p.description,
+        p.amenities, p.size_sqft, p.photo_url, p.is_active, p.created_at, p.updated_at,
+        p.osm_id::text as osm_id,
+        ST_AsGeoJSON(p.boundary)::text as boundary_geojson,
         COUNT(DISTINCT ps.id) FILTER (WHERE ps.is_active = true) as dog_count
       FROM parks p
       LEFT JOIN presence_sessions ps ON ps.park_id = p.id
@@ -116,10 +120,17 @@ router.get("/parks/nearby", async (ctx: RouterContext<string>) => {
     // Use PostGIS to find nearby parks
     const query = `
       SELECT
-        p.*,
+        p.id, p.name, p.latitude, p.longitude, p.address, p.city, p.state,
+        p.zip_code, p.neighborhood, p.geofence_radius, p.description,
+        p.amenities, p.size_sqft, p.photo_url, p.is_active, p.created_at, p.updated_at,
+        p.osm_id::text as osm_id,
+        ST_AsGeoJSON(p.boundary)::text as boundary_geojson,
         COUNT(DISTINCT ps.id) FILTER (WHERE ps.is_active = true) as dog_count,
         ST_Distance(
-          p.location,
+          COALESCE(
+            ST_Centroid(p.boundary),
+            ST_SetSRID(ST_MakePoint(p.longitude, p.latitude), 4326)
+          )::geography,
           ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
         ) as distance
       FROM parks p
@@ -129,7 +140,10 @@ router.get("/parks/nearby", async (ctx: RouterContext<string>) => {
       WHERE
         p.is_active = true
         AND ST_DWithin(
-          p.location,
+          COALESCE(
+            ST_Centroid(p.boundary),
+            ST_SetSRID(ST_MakePoint(p.longitude, p.latitude), 4326)
+          )::geography,
           ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
           $3
         )
@@ -174,7 +188,12 @@ router.get("/parks/:parkId", async (ctx: RouterContext<string>) => {
   try {
     // Get park details
     const parkResult = await client.queryObject<Park>(
-      "SELECT * FROM parks WHERE id = $1 AND is_active = true",
+      `SELECT id, name, latitude, longitude, address, city, state, zip_code,
+              neighborhood, geofence_radius, description, amenities, size_sqft,
+              photo_url, is_active, created_at, updated_at,
+              osm_id::text as osm_id,
+              ST_AsGeoJSON(boundary)::text as boundary_geojson
+       FROM parks WHERE id = $1 AND is_active = true`,
       [parkId]
     );
 
@@ -232,34 +251,19 @@ router.get("/parks/:parkId", async (ctx: RouterContext<string>) => {
   }
 });
 
-router.get("/parks/retrieve-nyc-parks", async (ctx: RouterContext<string>) => {
-  const client = await pool.connect();
-
+/**
+ * POST /parks/sync-osm
+ * Sync NYC dog parks from OpenStreetMap via Overpass API
+ */
+router.post("/parks/sync-osm", async (ctx: RouterContext<string>) => {
   try {
-    const query = `...`; // above query
-    const url =
-      "https://overpass-api.de/api/interpreter?data=" +
-      encodeURIComponent(query);
-
-    const res = await fetch(url);
-    const osm = await res.json();
-
-    const geojson = osmtogeojson(osm);
-
-    // Filter to polygons only
-    const parkPolygons = geojson.features.filter(
-      (f: any) =>
-        f.geometry &&
-        (f.geometry.type === "Polygon" || f.geometry.type === "MultiPolygon")
-    );
-
+    const result = await syncNycDogParks();
     ctx.response.status = 200;
-    ctx.response.body = {
-      success: true,
-      data: parkPolygons,
-    };
+    ctx.response.body = { success: true, data: result };
   } catch (error) {
-    console.error("Map parks error:", error);
+    console.error("OSM sync error:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { success: false, error: "Failed to sync parks from OSM" };
   }
 });
 

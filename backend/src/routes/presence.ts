@@ -88,10 +88,14 @@ router.post("/presence/checkin", async (ctx: RouterContext<string>) => {
       return;
     }
 
-    // Get park details
-    const parkResult = await client.queryObject<Park>(
-      "SELECT * FROM parks WHERE id = $1 AND is_active = true",
-      [park_id]
+    // Get park details with optional polygon containment check
+    const parkResult = await client.queryObject<Park & { within_boundary: boolean | null }>(
+      `SELECT p.*,
+        CASE WHEN p.boundary IS NOT NULL THEN
+          ST_Within(ST_SetSRID(ST_MakePoint($2, $3), 4326), p.boundary)
+        ELSE NULL END as within_boundary
+       FROM parks p WHERE p.id = $1 AND p.is_active = true`,
+      [park_id, longitude, latitude]
     );
 
     if (parkResult.rows.length === 0) {
@@ -105,12 +109,15 @@ router.post("/presence/checkin", async (ctx: RouterContext<string>) => {
 
     const park = parkResult.rows[0];
 
-    // Verify user is within geofence
-    const isInGeofence = isWithinGeofence(
-      { latitude, longitude },
-      { latitude: Number(park.latitude), longitude: Number(park.longitude) },
-      park.geofence_radius || PARK_CHECKIN_RADIUS_METERS
-    );
+    // Verify user is within geofence — prefer polygon check, fall back to Haversine
+    const isInGeofence =
+      park.within_boundary !== null
+        ? park.within_boundary
+        : isWithinGeofence(
+            { latitude, longitude },
+            { latitude: Number(park.latitude), longitude: Number(park.longitude) },
+            park.geofence_radius || PARK_CHECKIN_RADIUS_METERS
+          );
 
     if (!isInGeofence) {
       ctx.response.status = 403;

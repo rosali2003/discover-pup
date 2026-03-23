@@ -64,6 +64,8 @@ export interface Park {
   photo_url?: string;
   is_active: boolean;
   created_at: string;
+  osm_id?: number;
+  boundary_geojson?: string; // GeoJSON geometry string from PostGIS
 }
 
 export interface ParkWithDogCount extends Park {

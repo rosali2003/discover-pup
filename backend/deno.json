@@ -2,7 +2,8 @@
   "tasks": {
     "dev": "deno run --allow-net --allow-env --allow-read --watch src/main.ts",
     "start": "deno run --allow-net --allow-env --allow-read src/main.ts",
-    "migrate": "deno run --allow-net --allow-env --allow-read src/db/migrate.ts"
+    "migrate": "deno run --allow-net --allow-env --allow-read src/db/migrate.ts",
+    "sync-parks": "deno run --allow-net --allow-env --allow-read src/tasks/syncParks.ts"
   },
   "imports": {
     "@oak": "https://deno.land/x/oak@v12.6.1/mod.ts",

@@ -1,3 +1,6 @@
+// Load .env file for build-time secrets (like SDK download token)
+require('dotenv').config();
+
 export default {
   expo: {
     name: "Discover Pup",
@@ -43,7 +46,8 @@ export default {
       ]
     ],
     extra: {
-      mapboxAccessToken: process.env.MAPBOX_PUBLIC_TOKEN
+      // Public token is safe to include - it's designed for client-side use
+      mapboxAccessToken: ""
     }
   }
 };
